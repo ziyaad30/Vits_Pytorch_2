@@ -3,6 +3,8 @@ import json
 import argparse
 import itertools
 import math
+import warnings
+warnings.filterwarnings("ignore")
 import torch
 from torch import nn, optim
 from torch.nn import functional as F
@@ -14,7 +16,7 @@ import torch.multiprocessing as mp
 import torch.distributed as dist
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.cuda.amp import autocast, GradScaler
-import tqdm
+from tqdm import tqdm
 
 import commons
 import utils
@@ -57,14 +59,12 @@ def run(rank, n_gpus, hps):
     global global_step
     if rank == 0:
         logger = utils.get_logger(hps.model_dir)
-        logger.info(hps)
+        # logger.info(hps)
         utils.check_git_hash(hps.model_dir)
         writer = SummaryWriter(log_dir=hps.model_dir)
         writer_eval = SummaryWriter(log_dir=os.path.join(hps.model_dir, "eval"))
 
-    dist.init_process_group(
-        backend="nccl", init_method="env://", world_size=n_gpus, rank=rank
-    )
+    dist.init_process_group(backend=  'gloo' if os.name == 'nt' else 'nccl', init_method='env://', world_size=n_gpus, rank=rank)
     torch.manual_seed(hps.train.seed)
     torch.cuda.set_device(rank)
 
@@ -287,6 +287,8 @@ def train_and_evaluate(
 
     train_loader.batch_sampler.set_epoch(epoch)
     global global_step
+    
+    pbar = tqdm
 
     net_g.train()
     net_d.train()
@@ -294,7 +296,7 @@ def train_and_evaluate(
         net_dur_disc.train()
 
     if rank == 0:
-        loader = tqdm.tqdm(train_loader, desc="Loading train data")
+        loader = pbar(train_loader, desc="Loading train data")
     else:
         loader = train_loader
     for batch_idx, (x, x_lengths, spec, spec_lengths, y, y_lengths) in enumerate(
@@ -423,12 +425,17 @@ def train_and_evaluate(
             if global_step % hps.train.log_interval == 0:
                 lr = optim_g.param_groups[0]["lr"]
                 losses = [loss_disc, loss_gen, loss_fm, loss_mel, loss_dur, loss_kl]
-                logger.info(
+                pbar.write(
                     "Train Epoch: {} [{:.0f}%]".format(
                         epoch, 100.0 * batch_idx / len(train_loader)
                     )
                 )
-                logger.info([x.item() for x in losses] + [global_step, lr])
+                
+                pbar.write(
+                    f"""
+                    train -- epoch: {epoch}, step: {global_step}, loss_mel: {losses[3]:.5f}, loss_kl: {losses[5]:.5f}, loss_fm: {losses[2]:.5f}, lr: {lr:.7f}
+                    """
+                )
 
                 scalar_dict = {
                     "loss/g/total": loss_gen_all,
@@ -505,6 +512,21 @@ def train_and_evaluate(
                     epoch,
                     os.path.join(hps.model_dir, "D_{}.pth".format(global_step)),
                 )
+                
+                old_g = utils.oldest_checkpoint_path(hps.model_dir, "G_[0-9]*.pth", preserved=2)
+                old_d = utils.oldest_checkpoint_path(hps.model_dir, "D_[0-9]*.pth", preserved=2)
+                old_dur = utils.oldest_checkpoint_path(hps.model_dir, "DUR_[0-9]*.pth", preserved=2)
+                
+                if os.path.exists(old_g):
+                    pbar.write(f"remove {old_g}")
+                    os.remove(old_g)
+                if os.path.exists(old_d):
+                    pbar.write(f"remove {old_d}")
+                    os.remove(old_d)
+                if os.path.exists(old_dur):
+                    pbar.write(f"remove {old_dur}")
+                    os.remove(old_dur)
+                    
                 if net_dur_disc is not None:
                     utils.save_checkpoint(
                         net_dur_disc,
