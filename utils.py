@@ -173,10 +173,16 @@ def load_filepaths_and_text(filename, split="|"):
 def get_hparams(init=True):
     parser = argparse.ArgumentParser()
     parser.add_argument( "-c", "--config", type=str, default="./configs/vits2_ljs_nosdp_drive.json", help="JSON file for configuration")
-    parser.add_argument("-m", "--model", type=str, default="/content/drive/MyDrive/vits_pytorch_2/ljs_base", help="Model name")
+    parser.add_argument("-m", "--model", type=str, default="ljs_base", help="Model name")
 
     args = parser.parse_args()
-    model_dir = os.path.join("./logs", args.model)
+
+    model_dir = ''
+    
+    if os.path.exists("/content/drive/MyDrive/vits_pytorch_2/"):
+        model_dir = os.path.join("/content/drive/MyDrive/vits_pytorch_2/logs", args.model)
+    else:
+        model_dir = os.path.join("./logs", args.model)
 
     if not os.path.exists(model_dir):
         os.makedirs(model_dir)
