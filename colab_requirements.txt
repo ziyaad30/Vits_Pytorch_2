@@ -3,5 +3,4 @@ librosa==0.8.1
 matplotlib
 phonemizer
 Unidecode
-tensorboardX
 scipy
