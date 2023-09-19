@@ -11,7 +11,7 @@ import torch
 
 MATPLOTLIB_FLAG = False
 
-logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
+logging.basicConfig(stream=sys.stdout, level=logging.ERROR)
 logger = logging
 
 
@@ -39,17 +39,12 @@ def load_checkpoint(checkpoint_path, model, optimizer=None):
     else:
         model.load_state_dict(new_state_dict)
     logger.info(
-        "Loaded checkpoint '{}' (iteration {})".format(checkpoint_path, iteration)
+        "Loaded checkpoint '{}' (epoch {})".format(checkpoint_path, iteration)
     )
     return model, optimizer, learning_rate, iteration
 
 
 def save_checkpoint(model, optimizer, learning_rate, iteration, checkpoint_path):
-    logger.info(
-        "Saving model and optimizer state at iteration {} to {}".format(
-            iteration, checkpoint_path
-        )
-    )
     if hasattr(model, "module"):
         state_dict = model.module.state_dict()
     else:
@@ -63,6 +58,21 @@ def save_checkpoint(model, optimizer, learning_rate, iteration, checkpoint_path)
         },
         checkpoint_path,
     )
+
+
+def extract_digits(f):
+    digits = "".join(filter(str.isdigit, f))
+    return int(digits) if digits else -1
+
+
+def oldest_checkpoint_path(dir_path, regex="G_[0-9]*.pth", preserved=4):
+    f_list = glob.glob(os.path.join(dir_path, regex))
+    f_list.sort(key=lambda f: extract_digits(f))
+    if len(f_list) > preserved:
+        x = f_list[0]
+        # print(f"oldest_checkpoint_path:{x}")
+        return x
+    return ""
 
 
 def summarize(
