@@ -4,4 +4,3 @@ matplotlib
 phonemizer
 Unidecode
 scipy
-tensorrt
