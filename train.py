@@ -103,7 +103,7 @@ def run(rank, n_gpus, hps):
         eval_dataset = TextAudioLoader(hps.data.validation_files, hps.data)
         eval_loader = DataLoader(
             eval_dataset,
-            num_workers=0,
+            num_workers=4,
             shuffle=False,
             batch_size=1,
             pin_memory=True,
@@ -227,6 +227,11 @@ def run(rank, n_gpus, hps):
         epoch_str = 1
         global_step = 0
 
+    if hps.pretrained:
+        print("Using pretrained model...")
+        epoch_str = 1
+        global_step = 0
+    
     scheduler_g = torch.optim.lr_scheduler.ExponentialLR(
         optim_g, gamma=hps.train.lr_decay, last_epoch=epoch_str - 2
     )
@@ -425,17 +430,8 @@ def train_and_evaluate(
             if global_step % hps.train.log_interval == 0:
                 lr = optim_g.param_groups[0]["lr"]
                 losses = [loss_disc, loss_gen, loss_fm, loss_mel, loss_dur, loss_kl]
-                pbar.write(
-                    "Train Epoch: {} [{:.0f}%]".format(
-                        epoch, 100.0 * batch_idx / len(train_loader)
-                    )
-                )
-                
-                pbar.write(
-                    f"""
-                    train -- epoch: {epoch}, step: {global_step}, loss_mel: {losses[3]:.5f}, loss_kl: {losses[5]:.5f}, loss_fm: {losses[2]:.5f}, lr: {lr:.7f}
-                    """
-                )
+                epoch_percent = 100.0 * batch_idx / len(train_loader)
+                pbar.write(f"Train Epoch: {epoch} [{epoch_percent:.0f}%], step: {global_step}, loss_mel: {losses[3]:.5f}, loss_kl: {losses[5]:.5f}, loss_fm: {losses[2]:.5f}, lr: {lr:.7f}")
 
                 scalar_dict = {
                     "loss/g/total": loss_gen_all,
@@ -497,7 +493,9 @@ def train_and_evaluate(
                 )
 
             if global_step % hps.train.eval_interval == 0:
+                pbar.write(f"Evaluating model...")
                 evaluate(hps, net_g, eval_loader, writer_eval)
+                pbar.write(f"Evaluation done.")
                 utils.save_checkpoint(
                     net_g,
                     optim_g,
