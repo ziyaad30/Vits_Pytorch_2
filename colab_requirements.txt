@@ -4,3 +4,4 @@ matplotlib
 phonemizer
 Unidecode
 scipy
+inflect
