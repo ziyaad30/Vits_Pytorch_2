@@ -174,10 +174,11 @@ def get_hparams(init=True):
     parser = argparse.ArgumentParser()
     parser.add_argument( "-c", "--config", type=str, default="./configs/vits2_ljs_nosdp.json", help="JSON file for configuration")
     parser.add_argument("-m", "--model", type=str, default="ljs_base", help="Model name")
+    parser.add_argument("-l", "--logs", type=str, default="/content/drive/MyDrive/vits_pytorch_2/logs", help="Logs and checkpoints path")
     parser.add_argument('-p', '--pretrained', action='store_true')
 
     args = parser.parse_args()
-    model_dir = os.path.join("./logs", args.model)
+    model_dir = os.path.join(args.logs, args.model)
 
     if not os.path.exists(model_dir):
         os.makedirs(model_dir)
