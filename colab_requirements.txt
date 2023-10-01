@@ -1,7 +1,7 @@
 Cython
 librosa==0.8.1
 matplotlib
-phonemizer
+deep-phonemizer
 Unidecode
 scipy
 inflect
