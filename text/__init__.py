@@ -22,6 +22,10 @@ def text_to_sequence(text, cleaner_names):
     for symbol in clean_text:
         symbol_id = _symbol_to_id[symbol]
         sequence += [symbol_id]
+    
+    print(clean_text)
+    seq_to_text = sequence_to_text(sequence)
+    print(seq_to_text)
     return sequence
 
 
