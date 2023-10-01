@@ -13,9 +13,12 @@ hyperparameter. Some cleaners are English-specific. You'll typically want to use
 """
 
 import re
+import os
 from unidecode import unidecode
 from .numbers import normalize_numbers
-from phonemizer import phonemize
+from dp.phonemizer import Phonemizer
+phonemizer = Phonemizer.from_checkpoint('en_us_cmudict_ipa_forward.pt')
+
 
 
 # Regular expression matching whitespace:
@@ -69,45 +72,33 @@ def collapse_whitespace(text):
 def convert_to_ascii(text):
     return unidecode(text)
 
-
-def basic_cleaners(text):
-    """Basic pipeline that lowercases and collapses whitespace without transliteration."""
-    text = lowercase(text)
-    text = collapse_whitespace(text)
-    return text
-
-
-def transliteration_cleaners(text):
-    """Pipeline for non-English text that transliterates to ASCII."""
-    text = convert_to_ascii(text)
-    text = lowercase(text)
-    text = collapse_whitespace(text)
-    return text
+def do_ipa(text):
+    text = text.split()
+    new_text = []
+    for t in text:
+        if t.startswith('*'):
+            t = t.replace("*", "")
+            new_text.append(t)
+        else:    
+            t = phoneme_text(t)
+            new_text.append(t)
+    
+    return ' '.join(new_text)
 
 
-def english_cleaners(text):
-    """Pipeline for English text, including abbreviation expansion."""
-    text = convert_to_ascii(text)
-    text = lowercase(text)
-    text = expand_abbreviations(text)
-    phonemes = phonemize(text, language="en-us", backend="espeak", strip=True)
-    phonemes = collapse_whitespace(phonemes)
-    return phonemes
+def phoneme_text(text, lang='en_us'):
+    text = phonemizer(text, lang)
+    return text.strip()
 
 
 def english_cleaners2(text):
-    """Pipeline for English text, including abbreviation expansion. + punctuation + stress"""
-    text = convert_to_ascii(text)
+    '''Pipeline for English text, including number and abbreviation expansion.'''
+    text = text.strip()
+    # text = convert_to_ascii(text)
     text = lowercase(text)
-    text = expand_abbreviations(text)
     text = expand_numbers(text)
-    phonemes = phonemize(
-        text,
-        language="en-us",
-        backend="espeak",
-        strip=True,
-        preserve_punctuation=True,
-        with_stress=True,
-    )
-    phonemes = collapse_whitespace(phonemes)
-    return phonemes
+    text = expand_abbreviations(text)
+    text = collapse_whitespace(text)
+    text = phoneme_text(text)
+    text = collapse_whitespace(text)
+    return text
