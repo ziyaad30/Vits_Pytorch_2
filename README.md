@@ -22,7 +22,7 @@ Would recommend experts to rename the ckpts to *_0.pth and starting the training
 - [vietnamese samples](https://github.com/p0p4k/vits2_pytorch/pull/10#issuecomment-1682307529) Thanks to [@ductho9799](https://github.com/ductho9799) for sharing!
 
 ## Prerequisites
-1. Python >= 3.10
+1. Python >= 3.8
 2. Tested on Pytorch version 1.13.1 with Google Colab and LambdaLabs cloud.
 3. Clone this repository
 4. Install python requirements. Please refer [requirements.txt](requirements.txt)
@@ -31,6 +31,7 @@ Would recommend experts to rename the ckpts to *_0.pth and starting the training
     1. Download and extract the LJ Speech dataset, then rename or create a link to the dataset folder: `ln -s /path/to/LJSpeech-1.1/wavs DUMMY1`
     1. For mult-speaker setting, download and extract the VCTK dataset, and downsample wav files to 22050 Hz. Then rename or create a link to the dataset folder: `ln -s /path/to/VCTK-Corpus/downsampled_wavs DUMMY2`
 6. Build Monotonic Alignment Search and run preprocessing if you use your own datasets.
+7. I used DeepPhonemizer to process text to ipa, please download model for that [here](https://public-asai-dl-models.s3.eu-central-1.amazonaws.com/DeepPhonemizer/en_us_cmudict_ipa_forward.pt)
 
 ```sh
 # Cython-version Monotonoic Alignment Search
