@@ -3,6 +3,8 @@ import json
 import argparse
 import itertools
 import math
+import warnings
+warnings.filterwarnings("ignore")
 import torch
 from torch import nn, optim
 from torch.nn import functional as F
@@ -14,7 +16,7 @@ import torch.multiprocessing as mp
 import torch.distributed as dist
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.cuda.amp import autocast, GradScaler
-import tqdm
+from tqdm import tqdm
 
 import commons
 import utils
@@ -96,7 +98,7 @@ def run(rank, n_gpus, hps):
     collate_fn = TextAudioSpeakerCollate()
     train_loader = DataLoader(
         train_dataset,
-        num_workers=4,
+        num_workers=8,
         shuffle=False,
         pin_memory=True,
         collate_fn=collate_fn,
@@ -106,7 +108,7 @@ def run(rank, n_gpus, hps):
         eval_dataset = TextAudioSpeakerLoader(hps.data.validation_files, hps.data)
         eval_loader = DataLoader(
             eval_dataset,
-            num_workers=4,
+            num_workers=8,
             shuffle=False,
             batch_size=hps.train.batch_size,
             pin_memory=True,
@@ -211,23 +213,49 @@ def run(rank, n_gpus, hps):
     if net_dur_disc is not None:
         net_dur_disc = DDP(net_dur_disc, device_ids=[rank], find_unused_parameters=True)
 
-    try:
-        _, _, _, epoch_str = utils.load_checkpoint(
-            utils.latest_checkpoint_path(hps.model_dir, "G_*.pth"), net_g, optim_g
-        )
-        _, _, _, epoch_str = utils.load_checkpoint(
-            utils.latest_checkpoint_path(hps.model_dir, "D_*.pth"), net_d, optim_d
-        )
-        if net_dur_disc is not None:
-            _, _, _, epoch_str = utils.load_checkpoint(
-                utils.latest_checkpoint_path(hps.model_dir, "DUR_*.pth"),
-                net_dur_disc,
-                optim_dur_disc,
+    pretrained_loaded = False
+    
+    if hps.pretrained:
+        print("Trying to get pretrained model from pretrained_models directory")
+        try:
+            _, _, _, step = utils.load_checkpoint(
+                utils.latest_checkpoint_path(hps.model_dir, "G_*.pth"), net_g, optim_g
             )
-        global_step = (epoch_str - 1) * len(train_loader)
-    except:
-        epoch_str = 1
-        global_step = 0
+            _, _, _, step = utils.load_checkpoint(
+                utils.latest_checkpoint_path(hps.model_dir, "D_*.pth"), net_d, optim_d
+            )
+            if net_dur_disc is not None:
+                _, _, _, step = utils.load_checkpoint(
+                    utils.latest_checkpoint_path(hps.model_dir, "DUR_*.pth"),
+                    net_dur_disc,
+                    optim_dur_disc,
+                )
+            epoch_str = 1
+            global_step = 0
+            pretrained_loaded = True
+        except:
+            print('No models found, skipping...')
+            pass
+    
+    if not pretrained_loaded:
+        try:
+            _, _, _, step = utils.load_checkpoint(
+                utils.latest_checkpoint_path(hps.model_dir, "G_*.pth"), net_g, optim_g
+            )
+            _, _, _, step = utils.load_checkpoint(
+                utils.latest_checkpoint_path(hps.model_dir, "D_*.pth"), net_d, optim_d
+            )
+            if net_dur_disc is not None:
+                _, _, _, step = utils.load_checkpoint(
+                    utils.latest_checkpoint_path(hps.model_dir, "DUR_*.pth"),
+                    net_dur_disc,
+                    optim_dur_disc,
+                )
+            global_step = step
+            
+        except:
+            epoch_str = 1
+            global_step = 0
 
     scheduler_g = torch.optim.lr_scheduler.ExponentialLR(
         optim_g, gamma=hps.train.lr_decay, last_epoch=epoch_str - 2
@@ -289,6 +317,8 @@ def train_and_evaluate(
 
     train_loader.batch_sampler.set_epoch(epoch)
     global global_step
+    
+    pbar = tqdm
 
     net_g.train()
     net_d.train()
@@ -296,7 +326,7 @@ def train_and_evaluate(
         net_dur_disc.train()
 
     if rank == 0:
-        loader = tqdm.tqdm(train_loader, desc="Loading train data")
+        loader = pbar(train_loader, desc="Loading train data")
     else:
         loader = train_loader
     for batch_idx, (
@@ -432,12 +462,8 @@ def train_and_evaluate(
             if global_step % hps.train.log_interval == 0:
                 lr = optim_g.param_groups[0]["lr"]
                 losses = [loss_disc, loss_gen, loss_fm, loss_mel, loss_dur, loss_kl]
-                logger.info(
-                    "Train Epoch: {} [{:.0f}%]".format(
-                        epoch, 100.0 * batch_idx / len(train_loader)
-                    )
-                )
-                logger.info([x.item() for x in losses] + [global_step, lr])
+                epoch_percent = 100.0 * batch_idx / len(train_loader)
+                pbar.write(f"Train Epoch: {epoch} [{epoch_percent:.0f}%], step: {global_step}, loss_mel: {losses[3]:.5f}, loss_dur: {losses[4]:.5f}, loss_kl: {losses[5]:.5f}, loss_fm: {losses[2]:.5f}, lr: {lr:.7f}")
 
                 scalar_dict = {
                     "loss/g/total": loss_gen_all,
