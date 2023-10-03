@@ -26,8 +26,8 @@ Would recommend experts to rename the ckpts to *_0.pth and starting the training
 2. Tested on Pytorch version 1.13.1 with Google Colab and LambdaLabs cloud.
 3. Clone this repository
 4. Install python requirements. Please refer [requirements.txt](requirements.txt)
-    ~~1. You may need to install espeak first: `apt-get install espeak`~~
-   1. I used DeepPhonemizer to process text to ipa, please download the model for [DeepPhonemizer here](https://public-asai-dl-models.s3.eu-central-1.amazonaws.com/DeepPhonemizer/en_us_cmudict_ipa_forward.pt) and place it in Vits_Pytorch_2 root directory.
+   1. ~~You may need to install espeak first: `apt-get install espeak`~~
+   2. I used DeepPhonemizer to process text to ipa, please download the model for [DeepPhonemizer here](https://public-asai-dl-models.s3.eu-central-1.amazonaws.com/DeepPhonemizer/en_us_cmudict_ipa_forward.pt) and place it in Vits_Pytorch_2 root directory.
 6. Download datasets
     1. Download and extract the LJ Speech dataset, then rename or create a link to the dataset folder: `ln -s /path/to/LJSpeech-1.1/wavs DUMMY1`
     2. For mult-speaker setting, download and extract the VCTK dataset, and downsample wav files to 22050 Hz. Then rename or create a link to the dataset folder: `ln -s /path/to/VCTK-Corpus/downsampled_wavs DUMMY2`
