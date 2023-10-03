@@ -209,42 +209,64 @@ def run(rank, n_gpus, hps):
     if net_dur_disc is not None:
         net_dur_disc = DDP(net_dur_disc, device_ids=[rank], find_unused_parameters=True)
 
-    try:
-        _, _, _, epoch_str = utils.load_checkpoint(
-            utils.latest_checkpoint_path(hps.model_dir, "G_*.pth"), net_g, optim_g
-        )
-        _, _, _, epoch_str = utils.load_checkpoint(
-            utils.latest_checkpoint_path(hps.model_dir, "D_*.pth"), net_d, optim_d
-        )
-        if net_dur_disc is not None:
-            _, _, _, epoch_str = utils.load_checkpoint(
-                utils.latest_checkpoint_path(hps.model_dir, "DUR_*.pth"),
-                net_dur_disc,
-                optim_dur_disc,
-            )
-        global_step = (epoch_str - 1) * len(train_loader)
-    except:
-        epoch_str = 1
-        global_step = 0
-
+    pretrained_loaded = False
+    
     if hps.pretrained:
-        print("Using pretrained model...")
-        epoch_str = 1
-        global_step = 0
+        print("Trying to get pretrained model from pretrained_models directory")
+        try:
+            _, _, _, step = utils.load_checkpoint(
+                utils.latest_checkpoint_path(hps.model_dir, "G_*.pth"), net_g, optim_g
+            )
+            _, _, _, step = utils.load_checkpoint(
+                utils.latest_checkpoint_path(hps.model_dir, "D_*.pth"), net_d, optim_d
+            )
+            if net_dur_disc is not None:
+                _, _, _, step = utils.load_checkpoint(
+                    utils.latest_checkpoint_path(hps.model_dir, "DUR_*.pth"),
+                    net_dur_disc,
+                    optim_dur_disc,
+                )
+            epoch_str = 1
+            global_step = 0
+            pretrained_loaded = True
+        except:
+            print('No models found, skipping...')
+            pass
+    
+    if not pretrained_loaded:
+        try:
+            _, _, _, step = utils.load_checkpoint(
+                utils.latest_checkpoint_path(hps.model_dir, "G_*.pth"), net_g, optim_g
+            )
+            _, _, _, step = utils.load_checkpoint(
+                utils.latest_checkpoint_path(hps.model_dir, "D_*.pth"), net_d, optim_d
+            )
+            if net_dur_disc is not None:
+                _, _, _, step = utils.load_checkpoint(
+                    utils.latest_checkpoint_path(hps.model_dir, "DUR_*.pth"),
+                    net_dur_disc,
+                    optim_dur_disc,
+                )
+            global_step = step
+            
+        except:
+            epoch_str = 1
+            global_step = 0
     
     scheduler_g = torch.optim.lr_scheduler.ExponentialLR(
-        optim_g, gamma=hps.train.lr_decay, last_epoch=epoch_str - 2
+        optim_g, gamma=hps.train.lr_decay, last_epoch=global_step - 1
     )
     scheduler_d = torch.optim.lr_scheduler.ExponentialLR(
-        optim_d, gamma=hps.train.lr_decay, last_epoch=epoch_str - 2
+        optim_d, gamma=hps.train.lr_decay, last_epoch=global_step - 1
     )
     if net_dur_disc is not None:
         scheduler_dur_disc = torch.optim.lr_scheduler.ExponentialLR(
-            optim_dur_disc, gamma=hps.train.lr_decay, last_epoch=epoch_str - 2
+            optim_dur_disc, gamma=hps.train.lr_decay, last_epoch=global_step - 1
         )
     else:
         scheduler_dur_disc = None
-
+        
+        
     scaler = GradScaler(enabled=hps.train.fp16_run)
 
     for epoch in range(epoch_str, hps.train.epochs + 1):
@@ -431,7 +453,7 @@ def train_and_evaluate(
                 lr = optim_g.param_groups[0]["lr"]
                 losses = [loss_disc, loss_gen, loss_fm, loss_mel, loss_dur, loss_kl]
                 epoch_percent = 100.0 * batch_idx / len(train_loader)
-                pbar.write(f"Train Epoch: {epoch} [{epoch_percent:.0f}%], step: {global_step}, loss_mel: {losses[3]:.5f}, loss_kl: {losses[5]:.5f}, loss_fm: {losses[2]:.5f}, lr: {lr:.7f}")
+                pbar.write(f"Train Epoch: {epoch} [{epoch_percent:.0f}%], step: {global_step}, loss_mel: {losses[3]:.5f}, loss_dur: {losses[4]:.5f}, loss_kl: {losses[5]:.5f}, loss_fm: {losses[2]:.5f}, lr: {lr:.7f}")
 
                 scalar_dict = {
                     "loss/g/total": loss_gen_all,
@@ -500,14 +522,14 @@ def train_and_evaluate(
                     net_g,
                     optim_g,
                     hps.train.learning_rate,
-                    epoch,
+                    global_step,
                     os.path.join(hps.model_dir, "G_{}.pth".format(global_step)),
                 )
                 utils.save_checkpoint(
                     net_d,
                     optim_d,
                     hps.train.learning_rate,
-                    epoch,
+                    global_step,
                     os.path.join(hps.model_dir, "D_{}.pth".format(global_step)),
                 )
                 
@@ -516,7 +538,7 @@ def train_and_evaluate(
                         net_dur_disc,
                         optim_dur_disc,
                         hps.train.learning_rate,
-                        epoch,
+                        global_step,
                         os.path.join(hps.model_dir, "DUR_{}.pth".format(global_step)),
                     )
                     
