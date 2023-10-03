@@ -251,6 +251,7 @@ def run(rank, n_gpus, hps):
                     net_dur_disc,
                     optim_dur_disc,
                 )
+            epoch_str = 1
             global_step = step
             
         except:
