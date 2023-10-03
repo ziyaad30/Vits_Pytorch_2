@@ -35,11 +35,11 @@ def load_checkpoint(checkpoint_path, model, optimizer=None):
             logger.info("%s is not in the checkpoint" % k)
             new_state_dict[k] = v
     if hasattr(model, "module"):
-        model.module.load_state_dict(new_state_dict)
+        model.module.load_state_dict(new_state_dict, strict=False)
     else:
-        model.load_state_dict(new_state_dict)
+        model.load_state_dict(new_state_dict, strict=False)
     logger.info(
-        "Loaded checkpoint '{}' (epoch {})".format(checkpoint_path, iteration)
+        "Loaded checkpoint '{}' (iteration {})".format(checkpoint_path, iteration)
     )
     return model, optimizer, learning_rate, iteration
 
@@ -174,11 +174,10 @@ def get_hparams(init=True):
     parser = argparse.ArgumentParser()
     parser.add_argument( "-c", "--config", type=str, default="./configs/vits2_ljs_nosdp.json", help="JSON file for configuration")
     parser.add_argument("-m", "--model", type=str, default="ljs_base", help="Model name")
-    parser.add_argument("-l", "--logs", type=str, default="/content/drive/MyDrive/vits_pytorch_2/logs", help="Logs and checkpoints path")
     parser.add_argument('-p', '--pretrained', action='store_true')
 
     args = parser.parse_args()
-    model_dir = os.path.join(args.logs, args.model)
+    model_dir = os.path.join("./logs", args.model)
 
     if not os.path.exists(model_dir):
         os.makedirs(model_dir)
